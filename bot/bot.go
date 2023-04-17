@@ -2,11 +2,12 @@ package bot
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/db"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/utils"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/db"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/utils"
 )
 
 type Bot struct {
@@ -58,11 +59,37 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 }
 
 func (b *Bot) checkBalance(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Implement check balance logic
+	userID := m.Author.ID
+
+	// Ensure the user exists in the database
+	err := b.DB.CreateUser(userID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error creating user in the database.")
+		return
+	}
+
+	// Get the user's DP balance
+	balance, err := b.DB.GetUser(userID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error retrieving user balance.")
+		return
+	}
+
+	// Send a message with the user's DP balance
+	response := fmt.Sprintf("<@%s>, your DP balance is: %d", userID, balance)
+	s.ChannelMessageSend(m.ChannelID, response)
 }
 
 func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
+	if len(args) < 3 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: !addpoints @User <amount>")
+		return
+	}
+
+	// Replace this with the actual role ID for the role that you want to allow access to the addPoints command
+	requiredRoleID := "your_required_role_id"
+
+	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
 		return
@@ -73,12 +100,50 @@ func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args [
 		return
 	}
 
-	// Continue with the command execution
+	targetUserID := args[1]
+	amount, err := strconv.Atoi(args[2])
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
+		return
+	}
 
+	// Ensure the target user exists in the database
+	err = b.DB.CreateUser(targetUserID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error creating target user in the database.")
+		return
+	}
+
+	// Get the target user's current DP balance
+	currentBalance, err := b.DB.GetUser(targetUserID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
+		return
+	}
+
+	// Update the target user's DP balance
+	newBalance := currentBalance + amount
+	err = b.DB.UpdateUser(targetUserID, newBalance)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
+		return
+	}
+
+	// Send a confirmation message to the channel
+	response := fmt.Sprintf("Successfully added %d DP to <@%s>. Their new balance is: %d", amount, targetUserID, newBalance)
+	s.ChannelMessageSend(m.ChannelID, response)
 }
 
 func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
+	if len(args) < 3 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: !removepoints @User <amount>")
+		return
+	}
+
+	// Replace this with the actual role ID for the role that you want to allow access to the removePoints command
+	requiredRoleID := "your_required_role_id"
+
+	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
 		return
@@ -89,8 +154,43 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 		return
 	}
 
-	// Continue with the command execution
+	targetUserID := args[1]
+	amount, err := strconv.Atoi(args[2])
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
+		return
+	}
 
+	// Ensure the target user exists in the database
+	err = b.DB.CreateUser(targetUserID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error creating target user in the database.")
+		return
+	}
+
+	// Get the target user's current DP balance
+	currentBalance, err := b.DB.GetUser(targetUserID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
+		return
+	}
+
+	// Update the target user's DP balance
+	newBalance := currentBalance - amount
+	if newBalance < 0 {
+		s.ChannelMessageSend(m.ChannelID, "Cannot remove more points than the user has.")
+		return
+	}
+
+	err = b.DB.UpdateUser(targetUserID, newBalance)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
+		return
+	}
+
+	// Send a confirmation message to the channel
+	response := fmt.Sprintf("Successfully removed %d DP from <@%s>. Their new balance is: %d", amount, targetUserID, newBalance)
+	s.ChannelMessageSend(m.ChannelID, response)
 }
 
 func (b *Bot) watchEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {

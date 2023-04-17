@@ -7,8 +7,8 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/bot"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/db"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/bot"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/db"
 )
 
 func main() {
