@@ -1,4 +1,4 @@
-module outlawlabs/RobinDPK
+module outlawprecision/RobinHoodDKP-BOT
 
 go 1.19
 
