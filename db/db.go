@@ -17,11 +17,11 @@ func NewDB(connectionString string) (*Database, error) {
 		return nil, fmt.Errorf("error opening database connection: %w", err)
 	}
 
-	err = conn.Ping()
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("error pinging database: %w", err)
-	}
+	/* 	err = conn.Ping()
+	   	if err != nil {
+	   		conn.Close()
+	   		return nil, fmt.Errorf("error pinging database: %w", err)
+	   	} */
 
 	return &Database{conn: conn}, nil
 }
@@ -39,7 +39,7 @@ func (db *Database) CreateUser(user_id int64) error {
 // CheckBalance returns the DP balance of the user with the given user_id
 func (db *Database) CheckBalance(user_id int64) (int, error) {
 	var balance int
-	err := db.conn.QueryRow("SELECT dpk_balance FROM users WHERE user_id = $1", user_id).Scan(&balance)
+	err := db.conn.QueryRow("SELECT dkp_balance FROM users WHERE user_id = $1", user_id).Scan(&balance)
 	if err != nil && err != sql.ErrNoRows {
 		return 0, fmt.Errorf("error checking balance: %w", err)
 	}
