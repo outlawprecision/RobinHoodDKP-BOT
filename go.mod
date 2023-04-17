@@ -1,4 +1,4 @@
-module outlawprecision/RobinHoodDKP-BOT
+module github.com/outlawprecision/RobinHoodDKP-BOT
 
 go 1.19
 
