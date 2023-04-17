@@ -32,7 +32,7 @@ func (b *Bot) Start() error {
 	return nil
 }
 
-func (b *Bot) onMessageCreat(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
@@ -42,7 +42,7 @@ func (b *Bot) onMessageCreat(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	args := strings.Fields(m.Content)
-	command := strings.ToLower(args[0][1:])
+	command := args[0][1:]
 
 	switch command {
 	case "checkbalance":
@@ -53,8 +53,6 @@ func (b *Bot) onMessageCreat(s *discordgo.Session, m *discordgo.MessageCreate) {
 		b.removePoints(s, m, args)
 	case "watchevent":
 		b.watchEvent(s, m, args)
-	default:
-		s.ChannelMessageSend(m.ChannelID, "Unknown command.")
 	}
 }
 
