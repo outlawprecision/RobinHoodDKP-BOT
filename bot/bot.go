@@ -46,7 +46,7 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 	switch command {
 	case "checkbalance":
-		b.checkBalance(s, m)
+		b.checkBalance(m)
 	case "addpoints":
 		b.addPoints(s, m, args)
 	case "removepoints":
@@ -56,30 +56,30 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 }
 
-func (b *Bot) CheckBalance(m *discordgo.MessageCreate) {
+func (b *Bot) checkBalance(m *discordgo.MessageCreate) {
 	// Convert the user ID to int64
 	userID, err := strconv.ParseInt(m.Author.ID, 10, 64)
 	if err != nil {
 		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid user ID")
 		return
 	}
-	// Ensure the user exists in the database
-	newUser, err := b.DB.CreateUser(userID)
+
+	balance, err := b.DB.CheckBalance(userID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error creating user in the database.")
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error checking balance: %v", err))
 		return
 	}
 
-	// Get the user's DP balance
-	balance, err := b.DB.GetUser(userID)
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error retrieving user balance.")
-		return
+	// Check if the user exists in the database
+	if balance == 0 {
+		err = b.DB.CreateUser(userID)
+		if err != nil {
+			b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error creating user: %v", err))
+			return
+		}
 	}
 
-	// Send a message with the user's DP balance
-	response := fmt.Sprintf("<@%s>, your DP balance is: %d", userID, balance)
-	s.ChannelMessageSend(m.ChannelID, response)
+	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Your balance is: %d", balance))
 }
 
 func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
@@ -102,7 +102,11 @@ func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args [
 		return
 	}
 
-	targetUserID := args[1]
+	targetUserID, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Invalid user.")
+		return
+	}
 	amount, err := strconv.Atoi(args[2])
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
@@ -117,7 +121,7 @@ func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args [
 	}
 
 	// Get the target user's current DP balance
-	currentBalance, err := b.DB.GetUser(targetUserID)
+	currentBalance, err := b.DB.CheckBalance(targetUserID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
 		return
@@ -125,7 +129,7 @@ func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args [
 
 	// Update the target user's DP balance
 	newBalance := currentBalance + amount
-	err = b.DB.UpdateUser(targetUserID, newBalance)
+	err = b.DB.AddPoints(targetUserID, newBalance)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
 		return
@@ -156,7 +160,7 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 		return
 	}
 
-	targetUserID := args[1]
+	targetUserID, err := strconv.ParseInt(args[1], 10, 64)
 	amount, err := strconv.Atoi(args[2])
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
@@ -171,7 +175,7 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 	}
 
 	// Get the target user's current DP balance
-	currentBalance, err := b.DB.GetUser(targetUserID)
+	currentBalance, err := b.DB.CheckBalance(targetUserID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
 		return
@@ -184,7 +188,7 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 		return
 	}
 
-	err = b.DB.UpdateUser(targetUserID, newBalance)
+	err = b.DB.AddPoints(targetUserID, newBalance)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
 		return
