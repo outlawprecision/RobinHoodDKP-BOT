@@ -32,7 +32,7 @@ func (b *Bot) Start() error {
 	return nil
 }
 
-func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (b *Bot) onMessageCreat(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}

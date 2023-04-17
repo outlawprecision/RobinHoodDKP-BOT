@@ -36,7 +36,10 @@ func main() {
 	myBot := bot.NewBot(discord, database)
 
 	// Start the Bot
-	myBot.Start()
+	err = myBot.Start()
+	if err != nil {
+		fmt.Println("Error starting the bot:", err)
+	}
 
 	// Open the WebSocket connection to Discord
 	err = discord.Open()
