@@ -95,17 +95,12 @@ func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	// Check the user's role for authorization
-	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
-		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
-		return
-	}
-
 	// Parse the target user ID from the message
-	targetUserID := strings.TrimPrefix(strings.TrimSuffix(args[1], ">"), "<@!")
+	targetUserID := strings.TrimPrefix(strings.TrimSuffix(args[1], ">"), "<@")
 	userID, err := strconv.ParseInt(targetUserID, 10, 64)
 	if err != nil {
 		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid target user ID")
+		fmt.Printf("Target userID: %s", targetUserID)
 		return
 	}
 
