@@ -1,0 +1,22 @@
+-- Create Users table
+CREATE TABLE IF NOT EXISTS users (
+    user_id BIGINT PRIMARY KEY,
+    dpk_balance INT NOT NULL DEFAULT 0
+);
+
+-- Create Events table
+CREATE TABLE IF NOT EXISTS events (
+    event_id BIGINT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    dkp_reward INT NOT NULL
+);
+
+-- Create User_Attendance table
+CREATE TABLE IF NOT EXISTS user_attendance (
+    user_id BIGINT REFERENCES users(user_id),
+    event_id BIGINT REFERENCES events(event_id),
+    PRIMARY KEY (user_id, event_id)
+);

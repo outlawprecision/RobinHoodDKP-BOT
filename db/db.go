@@ -11,7 +11,7 @@ type DB struct {
 	conn *sql.DB
 }
 
-func Connect(connString string) (*DB, error) {
+func NewDB(connString string) (*DB, error) {
 	conn, err := sql.Open("postgres", connString)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to the database: %v", err)

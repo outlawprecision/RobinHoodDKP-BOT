@@ -14,43 +14,40 @@ import (
 func main() {
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
-		fmt.Println("Error: DISCORD_TOKEN not found in environment variables")
+		fmt.Println("Error: DISCORD_TOKEN environment variable not set")
 		return
 	}
 
-	// Create a new Discord session using the provided bot token.
-	session, err := discordgo.New("Bot " + token)
+	discord, err := discordgo.New("Bot " + token)
 	if err != nil {
 		fmt.Println("Error creating Discord session:", err)
 		return
 	}
 
-	// Initialize the database
-	db, err := db.Connect(os.Getenv("DATABASE_URL"))
+	// Initialize the database connection
+	database, err := db.NewDB(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		fmt.Println("Error connecting to the database:", err)
 		return
 	}
-	defer db.Close()
+	defer database.Close()
 
 	// Initialize the bot
-	myBot := bot.NewBot(session, db)
+	myBot := bot.NewBot(discord, database)
 
-	// Start the bot
-	err = myBot.Start()
+	// Register bot event handlers
+	discord.AddHandler(myBot.onMessageCreate)
+
+	// Open the WebSocket connection to Discord
+	err = discord.Open()
 	if err != nil {
-		fmt.Println("Error starting the bot:", err)
+		fmt.Println("Error opening WebSocket connection:", err)
 		return
 	}
+	defer discord.Close()
 
-	// Wait for a CTRL+C or other termination signal
+	fmt.Println("Bot is now running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
-
-	// Cleanly close the Discord session
-	err = session.Close()
-	if err != nil {
-		fmt.Println("Error closing Discord session:", err)
-	}
 }
