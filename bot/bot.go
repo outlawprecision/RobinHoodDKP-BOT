@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"https://github.com/outlawprecision/RobinHoodDKP-BOT/db"
-	"https://github.com/outlawprecision/RobinHoodDKP-BOT/utils"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/db"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/utils"
 )
 
 type Bot struct {
@@ -62,13 +62,49 @@ func (b *Bot) checkBalance(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	// Implement add points logic
+	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
+		return
+	}
+
+	if !hasRole {
+		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
+		return
+	}
+
+	// Continue with the command execution
+
 }
 
 func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	// Implement remove points logic
+	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
+		return
+	}
+
+	if !hasRole {
+		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
+		return
+	}
+
+	// Continue with the command execution
+
 }
 
 func (b *Bot) watchEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	// Implement watch event logic
+	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
+		return
+	}
+
+	if !hasRole {
+		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
+		return
+	}
+
+	// Continue with the command execution
+
 }
