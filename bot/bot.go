@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/db"
-	"github.com/outlawprecision/RobinHoodDKP-BOT/utils"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/db"
+	"github.com/outlawprecision/RobinHoodDKP-BOT/tree/main/utils"
 )
 
 type Bot struct {
