@@ -87,7 +87,7 @@ func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args [
 	}
 
 	// Replace this with the actual role ID for the role that you want to allow access to the addPoints command
-	requiredRoleID := "your_required_role_id"
+	requiredRoleID := "1037734711201644614"
 
 	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
 	if err != nil {
@@ -141,7 +141,7 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 	}
 
 	// Replace this with the actual role ID for the role that you want to allow access to the removePoints command
-	requiredRoleID := "your_required_role_id"
+	requiredRoleID := "1037734711201644614"
 
 	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
 	if err != nil {
