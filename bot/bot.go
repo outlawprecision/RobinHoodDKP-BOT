@@ -12,10 +12,10 @@ import (
 
 type Bot struct {
 	Session *discordgo.Session
-	DB      *db.Database
+	DB      *db.DB
 }
 
-func NewBot(session *discordgo.Session, db *db.Database) *Bot {
+func NewBot(session *discordgo.Session, db *db.DB) *Bot {
 	return &Bot{
 		Session: session,
 		DB:      db,
@@ -45,41 +45,63 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 	command := args[0][1:]
 
 	switch command {
+	case "enrolldkp":
+		b.enrollDkp(m)
 	case "checkbalance":
-		b.checkBalance(m)
+		b.checkBalance(m, args)
 	case "addpoints":
 		b.addPoints(m, args)
 	case "removepoints":
-		b.removePoints(s, m, args)
+		b.removePoints(m, args)
 	case "watchevent":
 		//b.watchEvent(s, m, args)
 	}
 }
 
-func (b *Bot) checkBalance(m *discordgo.MessageCreate) {
-	// Convert the user ID to int64
+func (b *Bot) enrollDkp(m *discordgo.MessageCreate) {
 	userID, err := strconv.ParseInt(m.Author.ID, 10, 64)
+	err = b.DB.CreateUser(userID)
+	if err != nil {
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error creating user: %v", err))
+		return
+	}
+	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("You have been enrolled!"))
+}
+
+func (b *Bot) checkBalance(m *discordgo.MessageCreate, args []string) {
+	userID := m.Author.ID
+
+	// Convert the author ID to int64
+	authorID, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid user ID")
 		return
 	}
 
-	balance, err := b.DB.CheckBalance(userID)
+	// Check if the user exists in the database
+	userExists, err := b.DB.UserExists(authorID)
 	if err != nil {
-		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error checking balance: %v", err))
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Cannot check user existence")
 		return
 	}
 
-	// Check if the user exists in the database
-	if balance == 0 {
-		err = b.DB.CreateUser(userID)
+	if !userExists {
+		// Create the user if they don't exist
+		err = b.DB.CreateUser(authorID)
 		if err != nil {
 			b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error creating user: %v", err))
 			return
 		}
 	}
 
-	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Your balance is: %d", balance))
+	// Get the user's balance
+	balance, err := b.DB.CheckBalance(authorID)
+	if err != nil {
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error checking balance: %v", err))
+		return
+	}
+
+	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, your balance is %d DKP", m.Author.Username, balance))
 }
 
 func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
@@ -117,6 +139,21 @@ func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
 		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid points value")
 		return
 	}
+	// Check if the target user exists in the database
+	userExists, err := b.DB.UserExists(userID)
+	if err != nil {
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Cannot check user existence")
+		return
+	}
+
+	if !userExists {
+		// Create the target user if they don't exist
+		err = b.DB.CreateUser(userID)
+		if err != nil {
+			b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error creating user: %v", err))
+			return
+		}
+	}
 
 	// Add points to the target user
 	err = b.DB.AddPoints(userID, points)
@@ -128,9 +165,10 @@ func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
 	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Added %d points to %s", points, targetUser.Username))
 }
 
-func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func (b *Bot) removePoints(m *discordgo.MessageCreate, args []string) {
+	// Ensure we have enough arguments
 	if len(args) < 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: !removepoints @User <amount>")
+		b.Session.ChannelMessageSend(m.ChannelID, "Usage: !removepoints <@user> <points>")
 		return
 	}
 
@@ -141,47 +179,36 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 		return
 	}
 
-	// Check the user's role for authorization
-	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
-		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
-		return
-	}
+	// Parse the target user ID from the message
+	targetUserID := strings.TrimPrefix(strings.TrimSuffix(args[1], ">"), "<@")
 
-	targetUserID, err := strconv.ParseInt(args[1], 10, 64)
-	amount, err := strconv.Atoi(args[2])
+	// Convert the target user ID to int64
+	userID, err := strconv.ParseInt(targetUserID, 10, 64)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid target user ID")
 		return
 	}
 
-	// Ensure the target user exists in the database
-	err = b.DB.CreateUser(targetUserID)
+	// Get the target user
+	targetUser, err := b.Session.User(targetUserID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error creating target user in the database.")
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error getting target user: %v", err))
 		return
 	}
 
-	// Get the target user's current DP balance
-	currentBalance, err := b.DB.CheckBalance(targetUserID)
+	// Parse the points
+	points, err := strconv.Atoi(args[2])
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid points value")
 		return
 	}
 
-	// Update the target user's DP balance
-	newBalance := currentBalance - amount
-	if newBalance < 0 {
-		s.ChannelMessageSend(m.ChannelID, "Cannot remove more points than the user has.")
-		return
-	}
-
-	err = b.DB.AddPoints(targetUserID, newBalance)
+	// Remove points from the target user
+	err = b.DB.RemovePoints(userID, points)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error removing points: %v", err))
 		return
 	}
 
-	// Send a confirmation message to the channel
-	response := fmt.Sprintf("Successfully removed %d DP from <@%s>. Their new balance is: %d", amount, targetUserID, newBalance)
-	s.ChannelMessageSend(m.ChannelID, response)
+	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed %d points from %s", points, targetUser.Username))
 }

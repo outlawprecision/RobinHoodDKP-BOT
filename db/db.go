@@ -7,53 +7,74 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type Database struct {
-	conn *sql.DB
+type DB struct {
+	*sql.DB
 }
 
-func NewDB(connectionString string) (*Database, error) {
-	conn, err := sql.Open("postgres", connectionString)
+func NewDB(dataSourceName string) (*DB, error) {
+	db, err := sql.Open("postgres", dataSourceName)
 	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
+		return nil, err
 	}
-
-	/* 	err = conn.Ping()
-	   	if err != nil {
-	   		conn.Close()
-	   		return nil, fmt.Errorf("error pinging database: %w", err)
-	   	} */
-
-	return &Database{conn: conn}, nil
+	return &DB{db}, nil
 }
 
-func (db *Database) Close() {
-	db.conn.Close()
-}
+func (db *DB) CreateUser(userID int64) error {
+	sqlStatement := `
+	INSERT INTO users (user_id, dkp_balance)
+	VALUES ($1, 0)
+	ON CONFLICT (user_id) DO NOTHING;`
 
-// CreateUser creates a new user in the users table with the given user_id
-func (db *Database) CreateUser(user_id int64) error {
-	_, err := db.conn.Exec("INSERT INTO users (user_id, dkp_balance) VALUES ($1, 0) ON CONFLICT DO NOTHING", user_id)
+	_, err := db.Exec(sqlStatement, userID)
 	return err
 }
 
-// CheckBalance returns the DP balance of the user with the given user_id
-func (db *Database) CheckBalance(user_id int64) (int, error) {
+func (db *DB) CheckBalance(userID int64) (int, error) {
+	sqlStatement := `
+	SELECT dkp_balance
+	FROM users
+	WHERE user_id = $1;`
+
 	var balance int
-	err := db.conn.QueryRow("SELECT dkp_balance FROM users WHERE user_id = $1", user_id).Scan(&balance)
-	if err != nil && err != sql.ErrNoRows {
-		return 0, fmt.Errorf("error checking balance: %w", err)
+	err := db.QueryRow(sqlStatement, userID).Scan(&balance)
+	return balance, err
+}
+
+func (db *DB) AddPoints(userID int64, points int) error {
+	sqlStatement := `
+	UPDATE users
+	SET dkp_balance = dkp_balance + $2
+	WHERE user_id = $1;`
+
+	_, err := db.Exec(sqlStatement, userID, points)
+	return err
+}
+
+func (db *DB) RemovePoints(userID int64, points int) error {
+	sqlStatement := `
+	UPDATE users
+	SET dkp_balance = dkp_balance - $2
+	WHERE user_id = $1
+	RETURNING dkp_balance;`
+
+	var newBalance int
+	err := db.QueryRow(sqlStatement, userID, points).Scan(&newBalance)
+	if err != nil {
+		return err
 	}
-	return balance, nil
-}
 
-// AddPoints adds the specified amount of points to the user with the given user_id
-func (db *Database) AddPoints(user_id int64, points int) error {
-	_, err := db.conn.Exec("UPDATE users SET dpk_balance = dpk_balance + $1 WHERE user_id = $2", points, user_id)
-	return err
-}
+	if newBalance < 0 {
+		// Revert the change and return an error if the new balance is negative
+		sqlStatement = `
+		UPDATE users
+		SET dkp_balance = dkp_balance + $2
+		WHERE user_id = $1;`
+		_, err := db.Exec(sqlStatement, userID, points)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("cannot remove more points than the current balance")
+	}
 
-// RemovePoints removes the specified amount of points from the user with the given user_id
-func (db *Database) RemovePoints(user_id int64, points int) error {
-	_, err := db.conn.Exec("UPDATE users SET dpk_balance = dpk_balance - $1 WHERE user_id = $2", points, user_id)
-	return err
+	return nil
 }
