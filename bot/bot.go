@@ -12,10 +12,10 @@ import (
 
 type Bot struct {
 	Session *discordgo.Session
-	DB      *db.DB
+	DB      *db.Database
 }
 
-func NewBot(session *discordgo.Session, db *db.DB) *Bot {
+func NewBot(session *discordgo.Session, db *db.Database) *Bot {
 	return &Bot{
 		Session: session,
 		DB:      db,
@@ -56,11 +56,15 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 }
 
-func (b *Bot) checkBalance(s *discordgo.Session, m *discordgo.MessageCreate) {
-	userID := m.Author.ID
-
+func (b *Bot) CheckBalance(m *discordgo.MessageCreate) {
+	// Convert the user ID to int64
+	userID, err := strconv.ParseInt(m.Author.ID, 10, 64)
+	if err != nil {
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid user ID")
+		return
+	}
 	// Ensure the user exists in the database
-	err := b.DB.CreateUser(userID)
+	newUser, err := b.DB.CreateUser(userID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error creating user in the database.")
 		return

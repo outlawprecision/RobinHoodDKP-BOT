@@ -31,6 +31,7 @@ func main() {
 		return
 	}
 	defer database.Close()
+	fmt.Printf("Database connected! database url: %s", os.Getenv("DATABASE_URL"))
 
 	// Initialize the bot
 	myBot := bot.NewBot(discord, database)
@@ -39,13 +40,6 @@ func main() {
 	err = myBot.Start()
 	if err != nil {
 		fmt.Println("Error starting the bot:", err)
-	}
-
-	// Open the WebSocket connection to Discord
-	err = discord.Open()
-	if err != nil {
-		fmt.Println("Error opening WebSocket connection:", err)
-		return
 	}
 	defer discord.Close()
 
