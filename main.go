@@ -35,8 +35,8 @@ func main() {
 	// Initialize the bot
 	myBot := bot.NewBot(discord, database)
 
-	// Register bot event handlers
-	discord.AddHandler(myBot.onMessageCreate)
+	// Start the Bot
+	myBot.Start()
 
 	// Open the WebSocket connection to Discord
 	err = discord.Open()
