@@ -1,19 +1,13 @@
 package utils
 
-import (
-	"github.com/bwmarrin/discordgo"
-)
-
-func HasRole(s *discordgo.Session, guildID, userID, requiredRoleID string) (bool, error) {
-	member, err := s.GuildMember(guildID, userID)
-	if err != nil {
-		return false, err
-	}
-
-	for _, roleID := range member.Roles {
-		if roleID == requiredRoleID {
-			return true, nil
+func IsAuthorized(userRoles []string, authorizedRoles []string) bool {
+	// Iterate through userRoles and check if any of them match an authorized role
+	for _, userRole := range userRoles {
+		for _, authorizedRole := range authorizedRoles {
+			if userRole == authorizedRole {
+				return true
+			}
 		}
 	}
-	return false, nil
+	return false
 }

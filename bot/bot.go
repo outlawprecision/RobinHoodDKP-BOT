@@ -48,11 +48,11 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 	case "checkbalance":
 		b.checkBalance(m)
 	case "addpoints":
-		b.addPoints(s, m, args)
+		b.addPoints(m, args)
 	case "removepoints":
 		b.removePoints(s, m, args)
 	case "watchevent":
-		b.watchEvent(s, m, args)
+		//b.watchEvent(s, m, args)
 	}
 }
 
@@ -82,62 +82,55 @@ func (b *Bot) checkBalance(m *discordgo.MessageCreate) {
 	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Your balance is: %d", balance))
 }
 
-func (b *Bot) addPoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
+	// Ensure we have enough arguments
 	if len(args) < 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: !addpoints @User <amount>")
+		b.Session.ChannelMessageSend(m.ChannelID, "Usage: !addpoints <@user> <points>")
+		return
+	}
+	// Check the user's role for authorization
+	authorizedRoles := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
+	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
 		return
 	}
 
-	// Replace this with the actual role ID for the role that you want to allow access to the addPoints command
-	requiredRoleID := "1037734711201644614"
+	// Check the user's role for authorization
+	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
+		return
+	}
 
-	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
+	// Parse the target user ID from the message
+	targetUserID := strings.TrimPrefix(strings.TrimSuffix(args[1], ">"), "<@!")
+	userID, err := strconv.ParseInt(targetUserID, 10, 64)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid target user ID")
 		return
 	}
 
-	if !hasRole {
-		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
-		return
-	}
-
-	targetUserID, err := strconv.ParseInt(args[1], 10, 64)
+	// Get the target user
+	targetUser, err := b.Session.User(targetUserID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Invalid user.")
-		return
-	}
-	amount, err := strconv.Atoi(args[2])
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Invalid amount.")
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error getting target user: %v", err))
 		return
 	}
 
-	// Ensure the target user exists in the database
-	err = b.DB.CreateUser(targetUserID)
+	// Parse the points
+	points, err := strconv.Atoi(args[2])
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error creating target user in the database.")
+		b.Session.ChannelMessageSend(m.ChannelID, "Error: Invalid points value")
 		return
 	}
 
-	// Get the target user's current DP balance
-	currentBalance, err := b.DB.CheckBalance(targetUserID)
+	// Add points to the target user
+	err = b.DB.AddPoints(userID, points)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error retrieving target user balance.")
+		b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error adding points: %v", err))
 		return
 	}
 
-	// Update the target user's DP balance
-	newBalance := currentBalance + amount
-	err = b.DB.AddPoints(targetUserID, newBalance)
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error updating target user balance.")
-		return
-	}
-
-	// Send a confirmation message to the channel
-	response := fmt.Sprintf("Successfully added %d DP to <@%s>. Their new balance is: %d", amount, targetUserID, newBalance)
-	s.ChannelMessageSend(m.ChannelID, response)
+	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Added %d points to %s", points, targetUser.Username))
 }
 
 func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
@@ -146,17 +139,16 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 		return
 	}
 
-	// Replace this with the actual role ID for the role that you want to allow access to the removePoints command
-	requiredRoleID := "1037734711201644614"
-
-	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, requiredRoleID)
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
+	// Check the user's role for authorization
+	authorizedRoles := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
+	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
 		return
 	}
 
-	if !hasRole {
-		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
+	// Check the user's role for authorization
+	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
 		return
 	}
 
@@ -197,20 +189,4 @@ func (b *Bot) removePoints(s *discordgo.Session, m *discordgo.MessageCreate, arg
 	// Send a confirmation message to the channel
 	response := fmt.Sprintf("Successfully removed %d DP from <@%s>. Their new balance is: %d", amount, targetUserID, newBalance)
 	s.ChannelMessageSend(m.ChannelID, response)
-}
-
-func (b *Bot) watchEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	hasRole, err := utils.HasRole(s, m.GuildID, m.Author.ID, "your_required_role_id")
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error checking user role.")
-		return
-	}
-
-	if !hasRole {
-		s.ChannelMessageSend(m.ChannelID, "You don't have the required role to execute this command.")
-		return
-	}
-
-	// Continue with the command execution
-
 }
