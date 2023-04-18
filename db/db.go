@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -11,12 +12,34 @@ type DB struct {
 	*sql.DB
 }
 
+type Event struct {
+	EventID     string
+	Name        string
+	Description string
+	StartTime   time.Time
+	EndTime     time.Time
+	DKP_Reward  int
+}
+
 func NewDB(dataSourceName string) (*DB, error) {
 	db, err := sql.Open("postgres", dataSourceName)
 	if err != nil {
 		return nil, err
 	}
 	return &DB{db}, nil
+}
+
+func (db *DB) UserExists(userID int64) (bool, error) {
+	sqlStatement := `
+	SELECT EXISTS (
+		SELECT 1
+		FROM users
+		WHERE user_id = $1
+	);`
+
+	var exists bool
+	err := db.QueryRow(sqlStatement, userID).Scan(&exists)
+	return exists, err
 }
 
 func (db *DB) CreateUser(userID int64) error {
@@ -77,4 +100,43 @@ func (db *DB) RemovePoints(userID int64, points int) error {
 	}
 
 	return nil
+}
+
+func (db *DB) CreateEvent(event Event) error {
+	sqlStatement := `
+	INSERT INTO events (event_id, name, description, start_time, end_time, dkp_reward)
+	VALUES ($1, $2, $3, $4, $5, $6);`
+
+	_, err := db.Exec(sqlStatement, event.EventID, event.Name, event.Description, event.StartTime, event.EndTime, event.DKP_Reward)
+	return err
+}
+
+func (db *DB) GetEvent(eventID string) (Event, error) {
+	sqlStatement := `
+	SELECT event_id, name, description, start_time, end_time, dkp_reward
+	FROM events
+	WHERE event_id = $1;`
+
+	var event Event
+	err := db.QueryRow(sqlStatement, eventID).Scan(&event.EventID, &event.Name, &event.Description, &event.StartTime, &event.EndTime, &event.DKP_Reward)
+	return event, err
+}
+
+func (db *DB) UpdateEvent(event Event) error {
+	sqlStatement := `
+	UPDATE events
+	SET name = $2, description = $3, start_time = $4, end_time = $5, dkp_reward = $6
+	WHERE event_id = $1;`
+
+	_, err := db.Exec(sqlStatement, event.EventID, event.Name, event.Description, event.StartTime, event.EndTime, event.DKP_Reward)
+	return err
+}
+
+func (db *DB) DeleteEvent(eventID string) error {
+	sqlStatement := `
+	DELETE FROM events
+	WHERE event_id = $1;`
+
+	_, err := db.Exec(sqlStatement, eventID)
+	return err
 }

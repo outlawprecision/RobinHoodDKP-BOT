@@ -1,7 +1,10 @@
 package bot
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +16,16 @@ import (
 type Bot struct {
 	Session *discordgo.Session
 	DB      *db.DB
+}
+
+type GuildEvent struct {
+	ID          string `json:"id"`
+	GuildID     string `json:"guild_id"`
+	ChannelID   string `json:"channel_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	StartTime   string `json:"scheduled_start_time"`
+	EndTime     string `json:"scheduled_end_time"`
 }
 
 func NewBot(session *discordgo.Session, db *db.DB) *Bot {
@@ -211,4 +224,47 @@ func (b *Bot) removePoints(m *discordgo.MessageCreate, args []string) {
 	}
 
 	b.Session.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed %d points from %s", points, targetUser.Username))
+}
+
+func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
+	// Parse event link to get server ID (Guild ID), channel ID, and event ID
+	eventLinkPattern := `https://discord.com/channels/(\d+)/(\d+)/events/(\d+)`
+	re := regexp.MustCompile(eventLinkPattern)
+	matches := re.FindStringSubmatch(eventLink)
+	if len(matches) != 4 {
+		return nil, fmt.Errorf("Invalid event link")
+	}
+
+	guildID, channelID, eventID := matches[1], matches[2], matches[3]
+
+	// Build the Discord API URL to fetch the event details
+	apiURL := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/channels/%s/events/%s", guildID, channelID, eventID)
+
+	// Create an HTTP request with the Discord API URL and the bot token
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bot "+b.Session.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send the request and parse the response to get the event details
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Error fetching event details: %s", resp.Status)
+	}
+
+	var event GuildEvent
+	err = json.NewDecoder(resp.Body).Decode(&event)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
 }
