@@ -246,7 +246,7 @@ func (b *Bot) removePoints(m *discordgo.MessageCreate, args []string) {
 }
 
 func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
-	// Parse event link to get server ID (Guild ID), channel ID, and event ID
+	// Parse event link to get server ID (Guild ID) and event ID
 	eventLinkPattern := `https://discord.com/events/(\d+)/(\d+)`
 	re := regexp.MustCompile(eventLinkPattern)
 	matches := re.FindStringSubmatch(eventLink)
@@ -256,36 +256,49 @@ func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
 
 	guildID, eventID := matches[1], matches[2]
 
-	// Build the Discord API URL to fetch the event details
-	apiURL := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/events/%s", guildID, eventID)
-
-	// Create an HTTP request with the Discord API URL and the bot token
-	req, err := http.NewRequest("GET", apiURL, nil)
+	// Fetch all the channels in the guild
+	channels, err := b.Session.GuildChannels(guildID)
 	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bot "+b.Session.Token)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send the request and parse the response to get the event details
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Error fetching event details: %s", resp.Status)
+		return nil, fmt.Errorf("Error fetching guild channels: %v", err)
 	}
 
-	var event GuildEvent
-	err = json.NewDecoder(resp.Body).Decode(&event)
-	if err != nil {
-		return nil, err
+	// Search for the event in each channel
+	var event *GuildEvent
+	for _, channel := range channels {
+		// Build the Discord API URL to fetch the event details
+		apiURL := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/channels/%s/events/%s", guildID, channel.ID, eventID)
+
+		// Create an HTTP request with the Discord API URL and the bot token
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bot "+b.Session.Token)
+		req.Header.Set("Content-Type", "application/json")
+
+		// Send the request and parse the response to get the event details
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			event = &GuildEvent{}
+			err = json.NewDecoder(resp.Body).Decode(event)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
 	}
 
-	return &event, nil
+	if event == nil {
+		return nil, fmt.Errorf("Event not found")
+	}
+
+	return event, nil
 }
 
 func (b *Bot) handleDkpEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
