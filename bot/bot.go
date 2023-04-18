@@ -16,6 +16,10 @@ import (
 type Bot struct {
 	Session *discordgo.Session
 	DB      *db.DB
+	Config  struct {
+		AdminRoleIDs []string
+		ServerID     string
+	}
 }
 
 type GuildEvent struct {
@@ -28,11 +32,28 @@ type GuildEvent struct {
 	EndTime     string `json:"scheduled_end_time"`
 }
 
-func NewBot(session *discordgo.Session, db *db.DB) *Bot {
-	return &Bot{
+func NewBot(token string, db *db.DB) (*Bot, error) {
+	session, err := discordgo.New("Bot " + token)
+	if err != nil {
+		return nil, err
+	}
+
+	adminRoleIDs := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
+	serverID := ""
+
+	bot := &Bot{
 		Session: session,
 		DB:      db,
+		Config: struct {
+			AdminRoleIDs []string
+			ServerID     string
+		}{
+			AdminRoleIDs: adminRoleIDs,
+			ServerID:     serverID,
+		},
 	}
+
+	return bot, nil
 }
 
 func (b *Bot) Start() error {
@@ -124,8 +145,7 @@ func (b *Bot) addPoints(m *discordgo.MessageCreate, args []string) {
 		return
 	}
 	// Check the user's role for authorization
-	authorizedRoles := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
-	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+	if !utils.IsAuthorized(m.Member.Roles, b.Config.AdminRoleIDs) {
 		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
 		return
 	}
@@ -186,8 +206,7 @@ func (b *Bot) removePoints(m *discordgo.MessageCreate, args []string) {
 	}
 
 	// Check the user's role for authorization
-	authorizedRoles := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
-	if !utils.IsAuthorized(m.Member.Roles, authorizedRoles) {
+	if !utils.IsAuthorized(m.Member.Roles, b.Config.AdminRoleIDs) {
 		b.Session.ChannelMessageSend(m.ChannelID, "You are not authorized to use this command.")
 		return
 	}
@@ -228,17 +247,17 @@ func (b *Bot) removePoints(m *discordgo.MessageCreate, args []string) {
 
 func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
 	// Parse event link to get server ID (Guild ID), channel ID, and event ID
-	eventLinkPattern := `https://discord.com/channels/(\d+)/(\d+)/events/(\d+)`
+	eventLinkPattern := `https://discord.com/events/(\d+)/(\d+)`
 	re := regexp.MustCompile(eventLinkPattern)
 	matches := re.FindStringSubmatch(eventLink)
-	if len(matches) != 4 {
+	if len(matches) != 3 {
 		return nil, fmt.Errorf("Invalid event link")
 	}
 
-	guildID, channelID, eventID := matches[1], matches[2], matches[3]
+	guildID, eventID := matches[1], matches[2]
 
 	// Build the Discord API URL to fetch the event details
-	apiURL := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/channels/%s/events/%s", guildID, channelID, eventID)
+	apiURL := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/events/%s", guildID, eventID)
 
 	// Create an HTTP request with the Discord API URL and the bot token
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -270,8 +289,8 @@ func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
 }
 
 func (b *Bot) handleDkpEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
-	adminRole := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
-	if !utils.IsAuthorized(m.Member.Roles, adminRole) {
+	//Check if user is Authorized to use this command
+	if !utils.IsAuthorized(m.Member.Roles, b.Config.AdminRoleIDs) {
 		s.ChannelMessageSend(m.ChannelID, "You do not have permission to use this command.")
 		return
 	}
