@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -16,8 +15,8 @@ type Event struct {
 	EventID     string
 	Name        string
 	Description string
-	StartTime   time.Time
-	EndTime     time.Time
+	StartTime   string
+	EndTime     string
 	DKP_Reward  int
 }
 
@@ -102,12 +101,13 @@ func (db *DB) RemovePoints(userID int64, points int) error {
 	return nil
 }
 
-func (db *DB) CreateEvent(event Event) error {
-	sqlStatement := `
-	INSERT INTO events (event_id, name, description, start_time, end_time, dkp_reward)
-	VALUES ($1, $2, $3, $4, $5, $6);`
-
-	_, err := db.Exec(sqlStatement, event.EventID, event.Name, event.Description, event.StartTime, event.EndTime, event.DKP_Reward)
+func (db *DB) CreateEvent(event *Event) error {
+	_, err := db.Exec(`
+		INSERT INTO Events (event_id, name, description, start_time, end_time, dkp_reward)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (event_id) DO UPDATE
+		SET name = $2, description = $3, start_time = $4, end_time = $5, dkp_reward = $6;
+	`, event.EventID, event.Name, event.Description, event.StartTime, event.EndTime, 0) // Initially set dkp_reward to 0
 	return err
 }
 

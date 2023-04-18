@@ -66,8 +66,8 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 		b.addPoints(m, args)
 	case "removepoints":
 		b.removePoints(m, args)
-	case "watchevent":
-		//b.watchEvent(s, m, args)
+	case "dkpevent":
+		b.handleDkpEvent(s, m, args)
 	}
 }
 
@@ -267,4 +267,47 @@ func (b *Bot) FetchEventDetails(eventLink string) (*GuildEvent, error) {
 	}
 
 	return &event, nil
+}
+
+func (b *Bot) handleDkpEvent(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	adminRole := []string{"1037734711201644614", "<RoleID2>", "<RoleID3>"} // Replace with the actual authorized role IDs
+	if !utils.IsAuthorized(m.Member.Roles, adminRole) {
+		s.ChannelMessageSend(m.ChannelID, "You do not have permission to use this command.")
+		return
+	}
+
+	if len(args) < 2 {
+		s.ChannelMessageSend(m.ChannelID, "Please provide a link to the Discord event.")
+		return
+	}
+
+	eventLink := args[1]
+	eventDetails, err := b.FetchEventDetails(eventLink)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error fetching event details: %v", err))
+		return
+	}
+
+	dkpReward, err := utils.ParseDkpReward(eventDetails.Description)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error parsing DKP reward: %v", err))
+		return
+	}
+
+	event := &db.Event{
+		EventID:     eventDetails.ID,
+		Name:        eventDetails.Name,
+		Description: eventDetails.Description,
+		StartTime:   eventDetails.StartTime,
+		EndTime:     eventDetails.EndTime,
+		DKP_Reward:  dkpReward,
+	}
+
+	err = b.DB.CreateEvent(event)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error saving event to the database: %v", err))
+		return
+	}
+
+	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Event '%s' saved successfully.", eventDetails.Name))
 }
